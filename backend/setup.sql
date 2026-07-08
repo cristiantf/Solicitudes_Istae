@@ -40,5 +40,5 @@ CREATE TABLE IF NOT EXISTS `usuarios` (
 -- 3. Insertar usuario administrador por defecto (Clave: istae2026)
 -- La clave está encriptada con password_hash de PHP
 INSERT IGNORE INTO `usuarios` (`username`, `password`, `nombre`, `rol`) VALUES
-('admin', '$2y$10$w/XyH5l.d8K8/p3oO1eP9.QZJ.3T/8/2B6rW3W9y4qX0w4qTzN95C', 'Administrador General', 'ADMIN'),
-('secretaria', '$2y$10$w/XyH5l.d8K8/p3oO1eP9.QZJ.3T/8/2B6rW3W9y4qX0w4qTzN95C', 'Personal de Secretaría', 'SECRETARIA');
+('admin', '$2y$10$D5tmzUQ6GI3dMinzLo3hHe7U9YSoLel4OZogE2AOq6Z3E5kjg3cby', 'Administrador General', 'ADMIN'),
+('secretaria', '$2y$10$D5tmzUQ6GI3dMinzLo3hHe7U9YSoLel4OZogE2AOq6Z3E5kjg3cby', 'Personal de Secretaría', 'SECRETARIA');
