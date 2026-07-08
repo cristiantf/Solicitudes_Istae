@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asistente de Solicitudes · ISTAE</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/docx/8.5.0/docx.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<header class="app">
+  <div class="marca">
+    <div class="sello"><img id="logo-img" src="" alt="Escudo ISTAE"></div>
+    <div>
+      <h1>Asistente de Solicitudes Estudiantiles</h1>
+      <p>Instituto Superior Tecnológico "Alberto Enríquez" · San Lorenzo, Esmeraldas</p>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- CHAT -->
+  <section class="chat" aria-label="Asistente conversacional">
+    <div class="chat-head"><span class="punto"></span> Secretaría virtual — te guía paso a paso</div>
+    <div class="hilo" id="hilo"></div>
+    <div class="entrada" id="zonaEntrada" style="display:none">
+      <input type="text" id="campoTexto" autocomplete="off">
+      <button id="btnEnviar">Enviar</button>
+    </div>
+  </section>
+
+  <!-- VISTA PREVIA -->
+  <section class="previa-panel">
+    <h2>Vista previa del documento</h2>
+    <div class="hoja" id="hoja"></div>
+  </section>
+</main>
+
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
