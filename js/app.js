@@ -1,7 +1,22 @@
 // Renderizar logo en la cabecera
 document.getElementById('logo-img').src = 'data:image/png;base64,' + LOGO_B64;
 
-const datos = { nombre:'', cedula:'', carrera:'', nivel:'', jornada:'', tramite:'', detalle:'', contacto:'', codigo:'' };
+const datos = { nombre:'', cedula:'', carrera:'', nivel:'', jornada:'', destinatario:'', unidadOtra:'', tramite:'', detalle:'', contacto:'', codigo:'' };
+
+/* ============ DESTINATARIO DE LA SOLICITUD ============ */
+function destinatarioActual(){
+  const base = CONFIG.destinatarios[datos.destinatario] || CONFIG.destinatarios['Rector'];
+  const d = {tratamiento: base.tratamiento, nombre: base.nombre, cargo: base.cargo};
+  if(datos.destinatario === 'Coordinación de Carrera'){
+    d.nombre = CONFIG.coordinadores[datos.carrera] || '';
+    d.cargo = 'COORDINADOR/A DE LA CARRERA DE ' + (datos.carrera||'________________').toUpperCase();
+    if(!d.nombre) d.tratamiento = '';
+  }
+  if(datos.destinatario === 'Otra unidad'){
+    d.cargo = (datos.unidadOtra || 'UNIDAD DEL ISTAE').toUpperCase();
+  }
+  return d;
+}
 
 /* ============ ASIGNACIÓN DE CÓDIGO (CONECTADO A PHP) ============ */
 async function asignarCodigo(){
@@ -47,6 +62,10 @@ const pasos = [
   { clave:'nivel',   pregunta:'¿En qué nivel te encuentras?', tipo:'opciones', opciones:()=>CONFIG.niveles },
   { clave:'jornada', pregunta:'¿Cuál es tu jornada?', tipo:'opciones', opciones:()=>CONFIG.jornadas },
   { clave:'tramite', pregunta:'¿Qué trámite deseas solicitar?', tipo:'opciones', opciones:()=>Object.keys(CONFIG.tramites) },
+  { clave:'destinatario', pregunta:'¿A quién o a qué unidad va dirigida tu solicitud?', tipo:'opciones', opciones:()=>Object.keys(CONFIG.destinatarios),
+    omitir:()=>{ const t=CONFIG.tramites[datos.tramite]; if(t && t.destino){ datos.destinatario=t.destino; return true; } return false; },
+    aviso:()=>{ const de=destinatarioActual(); return 'Este trámite corresponde a: ' + de.cargo + '. Dirigiré tu solicitud automáticamente a esa unidad. ✅'; } },
+  { clave:'unidadOtra', pregunta:'Escribe el nombre de la unidad, departamento o autoridad a quien va dirigida (por ejemplo: Biblioteca, Talento Humano…).', tipo:'texto', valida:v=>v.trim().length>=3 || 'Escribe el nombre de la unidad.', omitir:()=>datos.destinatario!=='Otra unidad' },
   { clave:'detalle', pregunta:'Cuéntame el detalle o motivo de tu solicitud (por ejemplo: fechas, asignaturas, razón del trámite). Sé breve y claro.', tipo:'texto', valida:v=>v.trim().length>=10 || 'Dame un poco más de detalle (mínimo 10 caracteres).' },
   { clave:'contacto',pregunta:'Por último, escribe un correo o teléfono de contacto.', tipo:'texto', valida:v=>v.trim().length>=7 || 'Escribe un correo o número válido.' }
 ];
@@ -69,6 +88,10 @@ function msgUser(texto){
 }
 
 function mostrarPaso(){
+  while(paso < pasos.length && pasos[paso].omitir && pasos[paso].omitir()){
+    if(pasos[paso].aviso){ setTimeout((a=>()=>msgBot(a))(pasos[paso].aviso()), 150); }
+    paso++;
+  }
   if(paso >= pasos.length){ return resumenFinal(); }
   const p = pasos[paso];
   setTimeout(()=>{
@@ -114,7 +137,7 @@ function resumenFinal(){
     await asignarCodigo();
     pintarPrevia();
     
-    msgBot('¡Listo, ' + datos.nombre.split(' ')[0] + '! Tu solicitud quedó registrada con el código ' + datos.codigo + '. Revisa la vista previa y descárgala en el formato que prefieras. Recuerda imprimirla, firmarla y entregarla en Secretaría.');
+    msgBot('¡Listo, ' + datos.nombre.split(' ')[0] + '! Tu solicitud (' + datos.codigo + ') está generada. Descárgala, imprímela y fírmala. El número de solicitud lo asignará el área que la reciba.');
     
     const cont=document.createElement('div'); cont.className='descargas';
     
@@ -139,8 +162,10 @@ function fechaLarga(){
 }
 
 function cuerpoSolicitud(){
-  const plantilla = CONFIG.tramites[datos.tramite] || (d=>d.detalle);
-  return `Yo, ${datos.nombre.toUpperCase()}, con cédula de ciudadanía N.º ${datos.cedula}, estudiante legalmente matriculado/a en la carrera de ${datos.carrera}, ${datos.nivel.toLowerCase()}, jornada ${datos.jornada.toLowerCase()}, período académico ${CONFIG.periodo}, me dirijo a usted de la manera más respetuosa para solicitar ${plantilla(datos)}`;
+  const plantilla = (CONFIG.tramites[datos.tramite] && CONFIG.tramites[datos.tramite].texto) || (d=>d.detalle);
+  const de = destinatarioActual();
+  const trato = de.nombre ? 'me dirijo a usted' : 'me dirijo a ustedes';
+  return `Yo, ${datos.nombre.toUpperCase()}, con cédula de ciudadanía N.º ${datos.cedula}, estudiante legalmente matriculado/a en la carrera de ${datos.carrera}, ${datos.nivel.toLowerCase()}, jornada ${datos.jornada.toLowerCase()}, período académico ${CONFIG.periodo}, ${trato} de la manera más respetuosa para solicitar ${plantilla(datos)}`;
 }
 const CIERRE = 'Por la favorable atención que se digne dar a la presente, le anticipo mis más sinceros agradecimientos.';
 
@@ -153,9 +178,13 @@ function pintarPrevia(){
   hoja.innerHTML = `
     <div class="memb"><img src="data:image/png;base64,${LOGO_B64}" alt="ISTAE" style="max-width:300px;width:80%;display:block;margin:0 auto 4px"><small>${CONFIG.subtitulo}</small></div>
     <hr>
-    ${datos.codigo ? `<p style="text-align:right"><b>Solicitud N.º ${datos.codigo}</b></p>` : ''}
+    ${datos.codigo ? `<p style="text-align:right"><b>Solicitud ${datos.codigo} — N.º ________</b></p>` : ''}
     <p style="text-align:right">${fechaLarga()}</p><br>
-    <p>${CONFIG.autoridad.tratamiento}<br><b>${CONFIG.autoridad.nombre}</b><br>${CONFIG.autoridad.cargo}<br>Presente.-</p><br>
+    ${(()=>{ const de=destinatarioActual();
+      if(!datos.destinatario) return `<p><span class="campo">Destinatario de la solicitud</span><br>Presente.-</p><br>`;
+      return de.nombre
+        ? `<p>${de.tratamiento? de.tratamiento+'<br>':''}<b>${de.nombre}</b><br>${de.cargo}<br>Presente.-</p><br>`
+        : `<p>Señores<br><b>${de.cargo}</b><br>Presente.-</p><br>`; })()}
     <p><b>Asunto:</b> ${datos.tramite || '<span class="campo">Tipo de trámite</span>'}</p><br>
     <p>De mi consideración:</p><br>
     <p style="text-align:justify">${cuerpo}</p><br>
@@ -184,14 +213,22 @@ function generarPDF(){
 
   doc.setFontSize(12);
   doc.setFont('times','bold');
-  doc.text('Solicitud N.º ' + (datos.codigo||'PENDIENTE'), ancho-margen, y, {align:'right'}); y+=7;
+  doc.text('Solicitud ' + (datos.codigo||'') + ' — N.º ____________', ancho-margen, y, {align:'right'}); y+=7;
   doc.setFont('times','normal');
   doc.text(fechaLarga(), ancho-margen, y, {align:'right'}); y+=12;
 
-  doc.text(CONFIG.autoridad.tratamiento, margen, y); y+=6;
-  doc.setFont('times','bold'); doc.text(CONFIG.autoridad.nombre, margen, y); y+=6;
-  doc.setFont('times','normal');
-  doc.splitTextToSize(CONFIG.autoridad.cargo, util).forEach(l=>{doc.text(l,margen,y);y+=6;});
+  const de = destinatarioActual();
+  if(de.nombre){
+    if(de.tratamiento){ doc.text(de.tratamiento, margen, y); y+=6; }
+    doc.setFont('times','bold'); doc.text(de.nombre, margen, y); y+=6;
+    doc.setFont('times','normal');
+    doc.splitTextToSize(de.cargo, util).forEach(l=>{doc.text(l,margen,y);y+=6;});
+  } else {
+    doc.text('Señores', margen, y); y+=6;
+    doc.setFont('times','bold');
+    doc.splitTextToSize(de.cargo, util).forEach(l=>{doc.text(l,margen,y);y+=6;});
+    doc.setFont('times','normal');
+  }
   doc.text('Presente.-', margen, y); y+=12;
 
   doc.setFont('times','bold'); doc.text('Asunto: ', margen, y);
@@ -256,12 +293,18 @@ function generarWord(){
         new D.Paragraph({
           alignment: D.AlignmentType.RIGHT,
           spacing: { after: 80 },
-          children: [ new D.TextRun({ text: 'Solicitud N.º ' + (datos.codigo||'PENDIENTE'), font: 'Times New Roman', size: 24, bold: true }) ]
+          children: [ new D.TextRun({ text: 'Solicitud ' + (datos.codigo||'') + ' — N.º ____________', font: 'Times New Roman', size: 24, bold: true }) ]
         }),
         P(fechaLarga(), { align: D.AlignmentType.RIGHT, despues: 300 }),
-        P(CONFIG.autoridad.tratamiento, { align: D.AlignmentType.LEFT, despues: 0 }),
-        P(CONFIG.autoridad.nombre, { align: D.AlignmentType.LEFT, bold: true, despues: 0 }),
-        P(CONFIG.autoridad.cargo, { align: D.AlignmentType.LEFT, despues: 0 }),
+        ...(()=>{ const de=destinatarioActual();
+          return de.nombre ? [
+            ...(de.tratamiento? [P(de.tratamiento,{align:D.AlignmentType.LEFT,despues:0})]:[]),
+            P(de.nombre,{align:D.AlignmentType.LEFT,bold:true,despues:0}),
+            P(de.cargo,{align:D.AlignmentType.LEFT,despues:0})
+          ] : [
+            P('Señores',{align:D.AlignmentType.LEFT,despues:0}),
+            P(de.cargo,{align:D.AlignmentType.LEFT,bold:true,despues:0})
+          ]; })(),
         P('Presente.-', { align: D.AlignmentType.LEFT, despues: 300 }),
         new D.Paragraph({
           spacing: { after: 300 },

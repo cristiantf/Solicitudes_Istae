@@ -14,29 +14,44 @@ const CONFIG = {
   subtitulo: 'San Lorenzo – Esmeraldas – Ecuador',
   ciudad: 'San Lorenzo',
   periodo: 'IPA 2026',
-  autoridad: {
-    tratamiento: 'Magíster',
-    nombre: 'Ever Alejandro Palacios Acosta',
-    cargo: 'RECTOR DEL INSTITUTO SUPERIOR TECNOLÓGICO "ALBERTO ENRÍQUEZ"'
+  // Destinatarios disponibles. Si 'nombre' está vacío, la solicitud
+  // se dirige de forma genérica ("Señores" + unidad/cargo).
+  destinatarios: {
+    'Rector': {tratamiento:'Magíster', nombre:'Ever Alejandro Palacios Acosta', cargo:'RECTOR DEL INSTITUTO SUPERIOR TECNOLÓGICO "ALBERTO ENRÍQUEZ"'},
+    'Secretaría General': {tratamiento:'', nombre:'', cargo:'UNIDAD DE SECRETARÍA GENERAL DEL INSTITUTO SUPERIOR TECNOLÓGICO "ALBERTO ENRÍQUEZ"'},
+    'Coordinación de Carrera': {tratamiento:'Ingeniero/a', nombre:'', cargo:''}, // el cargo se arma con la carrera del estudiante
+    'Vinculación con la Sociedad (incluye Prácticas)': {tratamiento:'', nombre:'', cargo:'COORDINACIÓN DE VINCULACIÓN CON LA SOCIEDAD DEL ISTAE'},
+    'Centro de Idiomas': {tratamiento:'', nombre:'', cargo:'COORDINACIÓN DEL CENTRO DE IDIOMAS DEL ISTAE'},
+    'Coordinación de Titulación': {tratamiento:'', nombre:'', cargo:'COORDINACIÓN DE TITULACIÓN DEL ISTAE'},
+    'Bienestar Institucional': {tratamiento:'', nombre:'', cargo:'UNIDAD DE BIENESTAR INSTITUCIONAL DEL ISTAE'},
+    'Otra unidad': {tratamiento:'', nombre:'', cargo:''} // la escribe el estudiante
   },
+  // Si escribes aquí el nombre del coordinador/a de cada carrera,
+  // la solicitud a Coordinación de Carrera saldrá con su nombre:
+  coordinadores: {'Desarrollo de Software':'', 'Mecánica Automotriz':'', 'Mecanización Agrícola':''},
   carreras: ['Desarrollo de Software', 'Mecánica Automotriz', 'Mecanización Agrícola'],
   siglas: {'Desarrollo de Software':'DS', 'Mecánica Automotriz':'MA', 'Mecanización Agrícola':'MAG'},
   niveles: ['Primer nivel','Segundo nivel','Tercer nivel','Cuarto nivel','Quinto nivel'],
   jornadas: ['Matutina','Vespertina','Nocturna'],
+  // Cada trámite tiene su unidad responsable en 'destino'.
+  // destino:null significa que el estudiante elige a quién dirigirla.
   tramites: {
-    'Certificado de matrícula': d =>
-      `la emisión de un CERTIFICADO DE MATRÍCULA correspondiente al período académico ${CONFIG.periodo}, documento que requiero para el siguiente fin: ${d.detalle}`,
-    'Récord académico': d =>
-      `la emisión de mi RÉCORD ACADÉMICO actualizado, documento que requiero para el siguiente fin: ${d.detalle}`,
-    'Justificación de inasistencia': d =>
-      `la JUSTIFICACIÓN DE MI INASISTENCIA a las actividades académicas, por el siguiente motivo: ${d.detalle} Adjunto a la presente los documentos de respaldo correspondientes.`,
-    'Retiro de asignatura': d =>
-      `el RETIRO VOLUNTARIO de la(s) asignatura(s) que detallo a continuación, conforme a la normativa vigente: ${d.detalle}`,
-    'Tercera matrícula': d =>
-      `la autorización de TERCERA MATRÍCULA en la(s) asignatura(s) que detallo, exponiendo el siguiente motivo: ${d.detalle}`,
-    'Homologación de asignaturas': d =>
-      `el inicio del proceso de HOMOLOGACIÓN DE ASIGNATURAS, conforme al siguiente detalle: ${d.detalle}`,
-    'Otro trámite': d => `${d.detalle}`
+    'Certificado de matrícula': {destino:'Secretaría General', texto: d =>
+      `la emisión de un CERTIFICADO DE MATRÍCULA correspondiente al período académico ${CONFIG.periodo}, documento que requiero para el siguiente fin: ${d.detalle}`},
+    'Certificado de egresado': {destino:'Secretaría General', texto: d =>
+      `la emisión de un CERTIFICADO DE EGRESADO/A, al haber culminado y aprobado la totalidad de la malla curricular de mi carrera, documento que requiero para el siguiente fin: ${d.detalle}`},
+    'Certificado de notas': {destino:'Secretaría General', texto: d =>
+      `la emisión de un CERTIFICADO DE NOTAS correspondiente al/los período(s) académico(s) que detallo a continuación: ${d.detalle}`},
+    'Récord académico': {destino:'Secretaría General', texto: d =>
+      `la emisión de mi RÉCORD ACADÉMICO actualizado, documento que requiero para el siguiente fin: ${d.detalle}`},
+    'Justificación de inasistencia': {destino:'Coordinación de Carrera', texto: d =>
+      `la JUSTIFICACIÓN DE MI INASISTENCIA a las actividades académicas, por el siguiente motivo: ${d.detalle} Adjunto a la presente los documentos de respaldo correspondientes.`},
+    'Retiro de asignatura': {destino:'Coordinación de Carrera', texto: d =>
+      `el RETIRO VOLUNTARIO de la(s) asignatura(s) que detallo a continuación, conforme a la normativa vigente: ${d.detalle}`},
+    'Tercera matrícula': {destino:'Rector', texto: d =>
+      `la autorización de TERCERA MATRÍCULA en la(s) asignatura(s) que detallo, exponiendo el siguiente motivo: ${d.detalle}`},
+    'Homologación de asignaturas': {destino:'Coordinación de Carrera', texto: d =>
+      `el inicio del proceso de HOMOLOGACIÓN DE ASIGNATURAS, conforme al siguiente detalle: ${d.detalle}`},
+    'Otro trámite': {destino:null, texto: d => `${d.detalle}`}
   }
 };
-
