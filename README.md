@@ -12,10 +12,12 @@ Plataforma de gestión documental "Cero Papeles" para el Instituto Superior Tecn
 
 ### Para Administración / Secretaría
 *   **Panel de Control Seguro:** Acceso restringido por roles (`ADMIN` y `SECRETARIA`).
-*   **Gestión de Estados:** Permite actualizar el estado de las solicitudes (Pendiente, En Revisión, Aprobada, Rechazada).
+*   **Gestión de Estados y Fechas:** Permite actualizar el estado de las solicitudes (Pendiente, Revisión, Aprobada, Rechazada) y modificar la fecha original de emisión.
+*   **Gestión de Usuarios:** Creación, edición (nombres, roles, contraseñas) y eliminación de personal de secretaría.
+*   **Eliminación Masiva:** Selección múltiple mediante checkboxes para borrar registros por lotes.
 *   **Control Físico:** Opción de digitar el "Número Físico" correlativo tras sellar el documento impreso.
-*   **Regeneración "Al Vuelo":** Reimpresión idéntica de PDFs/Word directamente desde la base de datos sin ocupar almacenamiento en disco.
-*   **Alto Rendimiento:** Tabla de datos con paginación optimizada para no saturar la memoria del servidor.
+*   **Regeneración "Al Vuelo":** Reimpresión idéntica de PDFs/Word directamente desde la base de datos sin ocupar almacenamiento en disco. El documento oculta inteligentemente el ID secuencial y muestra solo la base del código.
+*   **Alto Rendimiento:** Tabla de datos con paginación optimizada para no saturar la memoria del servidor e interfaz mejorada con SweetAlert2.
 
 ## Instalación y Configuración (Entorno XAMPP/Moodle)
 
@@ -47,6 +49,6 @@ Plataforma de gestión documental "Cero Papeles" para el Instituto Superior Tecn
 
 ## Tecnologías Utilizadas
 *   **Frontend:** HTML5, CSS3, Vanilla JavaScript (ES6+).
-*   **Librerías Frontend:** jsPDF (v2.5.1), docx (v8.5.0).
+*   **Librerías Frontend:** jsPDF (v2.5.1), docx (v8.5.0), SweetAlert2 (v11).
 *   **Backend:** PHP 8+ (PDO, prepared statements, LOCK TABLES).
 *   **Base de Datos:** MySQL / MariaDB.

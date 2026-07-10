@@ -178,7 +178,7 @@ function pintarPrevia(){
   hoja.innerHTML = `
     <div class="memb"><img src="data:image/png;base64,${LOGO_B64}" alt="ISTAE" style="max-width:300px;width:80%;display:block;margin:0 auto 4px"><small>${CONFIG.subtitulo}</small></div>
     <hr>
-    ${datos.codigo ? `<p style="text-align:right"><b>Solicitud ${datos.codigo} — N.º ________</b></p>` : ''}
+    ${datos.codigo ? `<p style="text-align:right"><b>Solicitud ${datos.codigo.split('-').slice(0,3).join('-')} — N.º ________</b></p>` : ''}
     <p style="text-align:right">${fechaLarga()}</p><br>
     ${(()=>{ const de=destinatarioActual();
       if(!datos.destinatario) return `<p><span class="campo">Destinatario de la solicitud</span><br>Presente.-</p><br>`;
@@ -213,7 +213,8 @@ function generarPDF(){
 
   doc.setFontSize(12);
   doc.setFont('times','bold');
-  doc.text('Solicitud ' + (datos.codigo||'') + ' — N.º ____________', ancho-margen, y, {align:'right'}); y+=7;
+  const codBase = datos.codigo ? datos.codigo.split('-').slice(0,3).join('-') : '';
+  doc.text('Solicitud ' + codBase + ' — N.º ____________', ancho-margen, y, {align:'right'}); y+=7;
   doc.setFont('times','normal');
   doc.text(fechaLarga(), ancho-margen, y, {align:'right'}); y+=12;
 
@@ -293,7 +294,7 @@ function generarWord(){
         new D.Paragraph({
           alignment: D.AlignmentType.RIGHT,
           spacing: { after: 80 },
-          children: [ new D.TextRun({ text: 'Solicitud ' + (datos.codigo||'') + ' — N.º ____________', font: 'Times New Roman', size: 24, bold: true }) ]
+          children: [ new D.TextRun({ text: 'Solicitud ' + (datos.codigo ? datos.codigo.split('-').slice(0,3).join('-') : '') + ' — N.º ____________', font: 'Times New Roman', size: 24, bold: true }) ]
         }),
         P(fechaLarga(), { align: D.AlignmentType.RIGHT, despues: 300 }),
         ...(()=>{ const de=destinatarioActual();

@@ -101,26 +101,68 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_numero'])) {
     exit;
 }
 
-// 3. Acciones de Usuarios (Solo ADMIN)
+// 2.5 Actualizar Fecha
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['update_fecha'])) {
+    $id = $_POST['solicitud_id'];
+    $nueva_fecha = trim($_POST['nueva_fecha']);
+    $pdo->prepare("UPDATE solicitudes SET fecha = ? WHERE id = ?")->execute([$nueva_fecha, $id]);
+    header("Location: admin.php" . (!empty($_SERVER['QUERY_STRING']) ? '?'.$_SERVER['QUERY_STRING'] : ''));
+    exit;
+}
+
+// 3. Eliminar Solicitud
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_solicitud'])) {
+    $id = $_POST['solicitud_id'];
+    $pdo->prepare("DELETE FROM solicitudes WHERE id = ?")->execute([$id]);
+    header("Location: admin.php" . (!empty($_SERVER['QUERY_STRING']) ? '?'.$_SERVER['QUERY_STRING'] : ''));
+    exit;
+}
+
+// 4. Eliminar Masivamente
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['delete_massive']) && !empty($_POST['selected_ids'])) {
+    $ids = $_POST['selected_ids'];
+    $placeholders = str_repeat('?,', count($ids) - 1) . '?';
+    $pdo->prepare("DELETE FROM solicitudes WHERE id IN ($placeholders)")->execute($ids);
+    header("Location: admin.php" . (!empty($_SERVER['QUERY_STRING']) ? '?'.$_SERVER['QUERY_STRING'] : ''));
+    exit;
+}
+
+// 5. Acciones de Usuarios (Solo ADMIN)
 $msg_usuarios = '';
 if ($_SESSION['rol'] === 'ADMIN' && $_SERVER['REQUEST_METHOD'] == 'POST') {
-    if (isset($_POST['crear_usuario'])) {
+    if (isset($_POST['action_type'])) {
         $u = trim($_POST['new_username']);
-        $p = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
         $n = trim($_POST['new_nombre']);
         $r = $_POST['new_rol'];
-        try {
-            $pdo->prepare("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?, ?, ?, ?)")->execute([$u, $p, $n, $r]);
-            $msg_usuarios = "<div class='success'>Usuario creado exitosamente.</div>";
-        } catch(PDOException $e) {
-            $msg_usuarios = "<div class='error'>Error al crear usuario (el username ya existe).</div>";
+        
+        if ($_POST['action_type'] === 'crear_usuario') {
+            $p = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
+            try {
+                $pdo->prepare("INSERT INTO usuarios (username, password, nombre, rol) VALUES (?, ?, ?, ?)")->execute([$u, $p, $n, $r]);
+                $msg_usuarios = "<script>document.addEventListener('DOMContentLoaded', ()=> Swal.fire('¡Éxito!', 'Usuario creado correctamente', 'success'));</script>";
+            } catch(PDOException $e) {
+                $msg_usuarios = "<script>document.addEventListener('DOMContentLoaded', ()=> Swal.fire('Error', 'El nombre de usuario ya existe', 'error'));</script>";
+            }
+        } elseif ($_POST['action_type'] === 'editar_usuario') {
+            $uid = $_POST['edit_user_id'];
+            try {
+                if (!empty($_POST['new_password'])) {
+                    $p = password_hash($_POST['new_password'], PASSWORD_DEFAULT);
+                    $pdo->prepare("UPDATE usuarios SET username=?, nombre=?, rol=?, password=? WHERE id=?")->execute([$u, $n, $r, $p, $uid]);
+                } else {
+                    $pdo->prepare("UPDATE usuarios SET username=?, nombre=?, rol=? WHERE id=?")->execute([$u, $n, $r, $uid]);
+                }
+                $msg_usuarios = "<script>document.addEventListener('DOMContentLoaded', ()=> Swal.fire('¡Actualizado!', 'Usuario actualizado correctamente', 'success'));</script>";
+            } catch(PDOException $e) {
+                $msg_usuarios = "<script>document.addEventListener('DOMContentLoaded', ()=> Swal.fire('Error', 'El nombre de usuario ya existe', 'error'));</script>";
+            }
         }
     }
     if (isset($_POST['eliminar_usuario'])) {
         $uid = $_POST['user_id'];
         if ($uid != $_SESSION['user_id']) { // Prevenir auto-eliminación
             $pdo->prepare("DELETE FROM usuarios WHERE id = ?")->execute([$uid]);
-            $msg_usuarios = "<div class='success'>Usuario eliminado.</div>";
+            $msg_usuarios = "<script>document.addEventListener('DOMContentLoaded', ()=> Swal.fire('¡Eliminado!', 'Usuario eliminado correctamente', 'success'));</script>";
         }
     }
 }
@@ -167,6 +209,7 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
     <!-- Incluir scripts necesarios para generar PDF y Word localmente -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="../js/config.js"></script>
     
     <style>
@@ -245,14 +288,18 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
                     <?php if($search): ?><a href="admin.php" style="margin-left:10px; font-size:0.9rem;">Limpiar</a><?php endif; ?>
                 </form>
             </div>
-            <div>
-                Total de registros: <b><?= $total_rows ?></b>
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <button onclick="deleteSelected()" style="background:#ef4444; color:white; border:none; padding:8px 15px; border-radius:4px; cursor:pointer; font-weight:bold;">Eliminar Seleccionados</button>
+                <div>
+                    Total de registros: <b><?= $total_rows ?></b>
+                </div>
             </div>
         </div>
         
         <table>
             <thead>
                 <tr>
+                    <th style="width:30px;"><input type="checkbox" id="selectAll"></th>
                     <th>Fecha</th>
                     <th>Código/Cédula</th>
                     <th>Estudiante</th>
@@ -273,7 +320,11 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
                     if($row['estado'] == 'RECHAZADA') $badge_class = 'bg-rechazada';
                 ?>
                 <tr>
-                    <td><?= date('d/m/Y H:i', strtotime($row['fecha'])) ?></td>
+                    <td><input type="checkbox" class="rowCheckbox" value="<?= $row['id'] ?>"></td>
+                    <td>
+                        <?= date('d/m/Y H:i', strtotime($row['fecha'])) ?><br>
+                        <a href="javascript:void(0)" onclick="editFecha(<?= $row['id'] ?>, '<?= $row['fecha'] ?>')" style="font-size:0.8rem; color:#38bdf8; text-decoration:none; font-weight:bold;">✎ Editar</a>
+                    </td>
                     <td>
                         <b><?= $row['codigo'] ?></b><br>
                         <?= $row['cedula'] ?>
@@ -309,6 +360,11 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
                     <td class="actions">
                         <button class="btn-gen" onclick="generarDocumentoAdmin(<?= $row['id'] ?>, 'pdf')" title="Descargar PDF">PDF</button>
                         <button class="btn-gen-w" onclick="generarDocumentoAdmin(<?= $row['id'] ?>, 'word')" title="Descargar Word">DOC</button>
+                        <form method="POST" style="display:inline-block; margin-left: 2px;">
+                            <input type="hidden" name="delete_solicitud" value="1">
+                            <input type="hidden" name="solicitud_id" value="<?= $row['id'] ?>">
+                            <button type="button" onclick="confirmDelete(this.form, '¿Seguro que deseas eliminar esta solicitud? Esta acción no se puede deshacer.')" style="background:#ef4444; color:white; border-color:#dc2626;" title="Eliminar Registro">X</button>
+                        </form>
                     </td>
                 </tr>
                 <?php endforeach; ?>
@@ -329,29 +385,31 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
         
         <div style="display:flex; gap: 30px;">
             <div class="form-panel" style="flex: 1;">
-                <h3>Crear Nuevo Usuario</h3>
-                <form method="POST">
-                    <input type="hidden" name="crear_usuario" value="1">
+                <h3 id="formTitle">Crear Nuevo Usuario</h3>
+                <form method="POST" id="userForm">
+                    <input type="hidden" name="action_type" id="action_type" value="crear_usuario">
+                    <input type="hidden" name="edit_user_id" id="edit_user_id" value="">
                     <div class="form-group">
                         <label>Nombre Completo</label>
-                        <input type="text" name="new_nombre" required>
+                        <input type="text" name="new_nombre" id="new_nombre" required>
                     </div>
                     <div class="form-group">
                         <label>Nombre de Usuario</label>
-                        <input type="text" name="new_username" required>
+                        <input type="text" name="new_username" id="new_username" required>
                     </div>
                     <div class="form-group">
                         <label>Contraseña</label>
-                        <input type="password" name="new_password" required>
+                        <input type="password" name="new_password" id="new_password" required>
                     </div>
                     <div class="form-group">
                         <label>Rol</label>
-                        <select name="new_rol">
+                        <select name="new_rol" id="new_rol">
                             <option value="SECRETARIA">SECRETARIA</option>
                             <option value="ADMIN">ADMINISTRADOR</option>
                         </select>
                     </div>
-                    <button type="submit">Crear Usuario</button>
+                    <button type="submit" id="btnSubmitUser">Crear Usuario</button>
+                    <button type="button" id="btnCancel" style="display:none; background:#64748b; margin-left:10px;" onclick="resetForm()">Cancelar</button>
                 </form>
             </div>
             
@@ -376,11 +434,12 @@ $tab = isset($_GET['tab']) ? $_GET['tab'] : 'solicitudes';
                             <td><?= htmlspecialchars($u['username']) ?></td>
                             <td><span class="badge <?= $u['rol']=='ADMIN'?'bg-aprobada':'bg-revision' ?>"><?= $u['rol'] ?></span></td>
                             <td class="actions">
+                                <button type="button" onclick="editUser(<?= $u['id'] ?>, '<?= htmlspecialchars($u['username'], ENT_QUOTES) ?>', '<?= htmlspecialchars($u['nombre'], ENT_QUOTES) ?>', '<?= $u['rol'] ?>')" style="background:#f59e0b; color:white; border-color:#d97706; margin-right:5px;">Editar</button>
                                 <?php if($u['id'] != $_SESSION['user_id']): ?>
-                                <form method="POST" onsubmit="return confirm('¿Eliminar usuario?');">
+                                <form method="POST" style="display:inline-block;">
                                     <input type="hidden" name="eliminar_usuario" value="1">
                                     <input type="hidden" name="user_id" value="<?= $u['id'] ?>">
-                                    <button type="submit" style="background:#ef4444; color:white; border-color:#dc2626;">Eliminar</button>
+                                    <button type="button" onclick="confirmDelete(this.form, '¿Seguro que deseas eliminar este usuario?')" style="background:#ef4444; color:white; border-color:#dc2626;">Eliminar</button>
                                 </form>
                                 <?php endif; ?>
                             </td>
@@ -414,7 +473,8 @@ function getSolicitudDatos(id) {
         detalle: row.detalle,
         contacto: row.contacto,
         codigo: row.codigo,
-        numero_fisico: row.numero_fisico
+        numero_fisico: row.numero_fisico,
+        fecha: row.fecha
     };
 }
 
@@ -439,9 +499,9 @@ function cuerpoAdmin(datos){
   return `Yo, ${datos.nombre.toUpperCase()}, con cédula de ciudadanía N.º ${datos.cedula}, estudiante legalmente matriculado/a en la carrera de ${datos.carrera}, ${datos.nivel.toLowerCase()}, jornada ${datos.jornada.toLowerCase()}, período académico ${CONFIG.periodo}, ${trato} de la manera más respetuosa para solicitar ${plantilla(datos)}`;
 }
 
-function fechaLargaAdmin(){
+function fechaLargaAdmin(fechaStr){
   const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  const h=new Date();
+  const h = fechaStr ? new Date(fechaStr.replace(' ', 'T')) : new Date();
   return `${CONFIG.ciudad}, ${h.getDate()} de ${meses[h.getMonth()]} de ${h.getFullYear()}`;
 }
 
@@ -464,9 +524,10 @@ function generarPDF(datos) {
   doc.setFontSize(12);
   doc.setFont('times','bold');
   const nf = datos.numero_fisico ? datos.numero_fisico : '____________';
-  doc.text('Solicitud ' + (datos.codigo||'') + ' — N.º ' + nf, ancho-margen, y, {align:'right'}); y+=7;
+  const codBase = datos.codigo ? datos.codigo.split('-').slice(0,3).join('-') : '';
+  doc.text('Solicitud ' + codBase + ' — N.º ' + nf, ancho-margen, y, {align:'right'}); y+=7;
   doc.setFont('times','normal');
-  doc.text(fechaLargaAdmin(), ancho-margen, y, {align:'right'}); y+=12;
+  doc.text(fechaLargaAdmin(datos.fecha), ancho-margen, y, {align:'right'}); y+=12;
 
   const de = destinatarioAdmin(datos);
   if(de.nombre){
@@ -544,9 +605,9 @@ function generarWord(datos){
         new D.Paragraph({
           alignment: D.AlignmentType.RIGHT,
           spacing: { after: 80 },
-          children: [ new D.TextRun({ text: 'Solicitud ' + (datos.codigo||'') + ' — N.º ' + nf, font: 'Times New Roman', size: 24, bold: true }) ]
+          children: [ new D.TextRun({ text: 'Solicitud ' + (datos.codigo ? datos.codigo.split('-').slice(0,3).join('-') : '') + ' — N.º ' + nf, font: 'Times New Roman', size: 24, bold: true }) ]
         }),
-        P(fechaLargaAdmin(), { align: D.AlignmentType.RIGHT, despues: 300 }),
+        P(fechaLargaAdmin(datos.fecha), { align: D.AlignmentType.RIGHT, despues: 300 }),
         ...(()=>{ 
           return de.nombre ? [
             ...(de.tratamiento? [P(de.tratamiento,{align:D.AlignmentType.LEFT,despues:0})]:[]),
@@ -590,6 +651,138 @@ function generarDocumentoAdmin(id, tipo) {
     if(!d) { alert('Error: No se encontraron los datos de la solicitud.'); return; }
     if(tipo === 'pdf') generarPDF(d);
     else generarWord(d);
+}
+
+// Lógica para eliminación masiva
+document.getElementById('selectAll')?.addEventListener('change', function(e) {
+    document.querySelectorAll('.rowCheckbox').forEach(cb => cb.checked = e.target.checked);
+});
+
+function editFecha(id, currentFecha) {
+    const formatted = currentFecha.replace(' ', 'T').substring(0, 16);
+    Swal.fire({
+        title: 'Editar Fecha de Solicitud',
+        html: `<p style="font-size:0.9rem; color:#64748b; margin-bottom:15px;">Esta fecha aparecerá en el documento generado.</p><input type="datetime-local" id="swal-input-fecha" class="swal2-input" style="max-width:90%;" value="${formatted}">`,
+        showCancelButton: true,
+        confirmButtonColor: '#16394F',
+        confirmButtonText: 'Guardar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+            return document.getElementById('swal-input-fecha').value;
+        }
+    }).then((result) => {
+        if (result.isConfirmed && result.value) {
+            const nuevaFecha = result.value.replace('T', ' ') + ':00';
+            const form = document.createElement('form');
+            form.method = 'POST';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'update_fecha';
+            actionInput.value = '1';
+            form.appendChild(actionInput);
+            
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'solicitud_id';
+            idInput.value = id;
+            form.appendChild(idInput);
+            
+            const fechaInput = document.createElement('input');
+            fechaInput.type = 'hidden';
+            fechaInput.name = 'nueva_fecha';
+            fechaInput.value = nuevaFecha;
+            form.appendChild(fechaInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+function deleteSelected() {
+    const selected = Array.from(document.querySelectorAll('.rowCheckbox:checked')).map(cb => cb.value);
+    if(selected.length === 0) {
+        Swal.fire('Atención', 'Selecciona al menos una solicitud para eliminar.', 'warning');
+        return;
+    }
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: `Se eliminarán ${selected.length} registro(s). Esta acción no se puede deshacer.`,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            
+            const actionInput = document.createElement('input');
+            actionInput.type = 'hidden';
+            actionInput.name = 'delete_massive';
+            actionInput.value = '1';
+            form.appendChild(actionInput);
+            
+            selected.forEach(id => {
+                const idInput = document.createElement('input');
+                idInput.type = 'hidden';
+                idInput.name = 'selected_ids[]';
+                idInput.value = id;
+                form.appendChild(idInput);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    });
+}
+
+function confirmDelete(form, msg) {
+    Swal.fire({
+        title: '¿Estás seguro?',
+        text: msg,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            form.submit();
+        }
+    });
+}
+
+function editUser(id, username, nombre, rol) {
+    document.getElementById('formTitle').textContent = 'Editar Usuario';
+    document.getElementById('action_type').value = 'editar_usuario';
+    document.getElementById('edit_user_id').value = id;
+    
+    document.getElementById('new_nombre').value = nombre;
+    document.getElementById('new_username').value = username;
+    document.getElementById('new_password').required = false;
+    document.getElementById('new_password').placeholder = 'Dejar en blanco para mantener actual';
+    document.getElementById('new_rol').value = rol;
+    
+    document.getElementById('btnSubmitUser').textContent = 'Guardar Cambios';
+    document.getElementById('btnCancel').style.display = 'inline-block';
+}
+
+function resetForm() {
+    document.getElementById('formTitle').textContent = 'Crear Nuevo Usuario';
+    document.getElementById('action_type').value = 'crear_usuario';
+    document.getElementById('edit_user_id').value = '';
+    
+    document.getElementById('userForm').reset();
+    document.getElementById('new_password').required = true;
+    document.getElementById('new_password').placeholder = '';
+    
+    document.getElementById('btnSubmitUser').textContent = 'Crear Usuario';
+    document.getElementById('btnCancel').style.display = 'none';
 }
 </script>
 

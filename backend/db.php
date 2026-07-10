@@ -5,9 +5,9 @@
 
 // ¡MODIFICA ESTOS DATOS CON LOS DE TU SERVIDOR WEBMIN!
 $db_host = 'localhost';
-$db_name = 'solicitudes_istae'; // Nombre de tu base de datos
-$db_user = 'root';              // Tu usuario de BD
-$db_pass = '';                  // Tu contraseña de BD
+$db_name = 'solicitudes_istae'; // Nombre de la BD que creaste en Webmin
+$db_user = 'root';              // Usuario de tu servidor Moodle
+$db_pass = 'luislopez';         // Contraseña de tu servidor Moodle
 
 try {
     $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
